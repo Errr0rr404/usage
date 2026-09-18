@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self';">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Usage</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="panel">
+  <header>
+    <h1>Usage</h1>
+    <div class="header-actions">
+      <button type="button" id="settings" aria-expanded="false" aria-haspopup="menu" aria-label="Settings">
+        <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M1.5 4.2h13M1.5 8h13M1.5 11.8h13" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path>
+          <circle cx="5.2" cy="4.2" r="1.5" fill="var(--ground)" stroke="currentColor" stroke-width="1.2"></circle>
+          <circle cx="10.8" cy="8" r="1.5" fill="var(--ground)" stroke="currentColor" stroke-width="1.2"></circle>
+          <circle cx="6.4" cy="11.8" r="1.5" fill="var(--ground)" stroke="currentColor" stroke-width="1.2"></circle>
+        </svg>
+      </button>
+      <button type="button" id="hide">Hide</button>
+    </div>
+  </header>
+
+  <div id="menu" hidden role="menu" aria-label="Settings">
+    <button type="button" id="add" role="menuitem">Add account</button>
+    <button type="button" id="refresh" role="menuitem">Refresh</button>
+    <button type="button" id="compact" role="menuitem">Compact</button>
+    <p class="menu-label">Theme</p>
+    <div class="themes" role="group" aria-label="Theme">
+      <button type="button" data-theme="ion" aria-pressed="true">Ion</button>
+      <button type="button" data-theme="ember" aria-pressed="false">Ember</button>
+      <button type="button" data-theme="void" aria-pressed="false">Void</button>
+    </div>
+    <button type="button" id="pin" role="menuitemcheckbox" aria-pressed="true">Keep on top</button>
+    <p class="menu-note" id="pin-note">Stays above other windows, on every desktop.</p>
+  </div>
+
+    <div id="board" aria-live="polite"></div>
+
+    <form id="form" hidden>
+      <fieldset>
+        <legend>Service</legend>
+        <div class="choice-grid" id="provider-choices">
+          <button type="button" data-provider="grok" aria-pressed="true">Grok</button>
+          <button type="button" data-provider="minimax" aria-pressed="false">MiniMax</button>
+          <button type="button" data-provider="codex" aria-pressed="false">Codex</button>
+          <button type="button" data-provider="claude" aria-pressed="false">Claude</button>
+        </div>
+      </fieldset>
+
+      <label class="field">
+        <span>Name</span>
+        <input id="label" type="text" maxlength="40" placeholder="Work, personal, a client" autocomplete="off" spellcheck="false">
+      </label>
+
+      <div class="field" id="region-field" hidden>
+        <span id="region-label">MiniMax site</span>
+        <div class="choice-grid" role="group" aria-labelledby="region-label">
+          <button type="button" data-region="global" aria-pressed="true">Global</button>
+          <button type="button" data-region="cn" aria-pressed="false">China</button>
+        </div>
+      </div>
+
+      <p id="help"></p>
+      <p id="form-error" class="error" hidden></p>
+    </form>
+
+    <footer id="footer-form" hidden>
+      <button type="button" id="cancel">Cancel</button>
+      <button type="button" id="save">Sign in</button>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
