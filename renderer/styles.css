@@ -156,7 +156,7 @@ input {
   top: 34px;
   right: 8px;
   z-index: 3;
-  width: 188px;
+  width: 214px;
   padding: 6px;
   background: color-mix(in srgb, var(--field) 92%, black);
   border: 1px solid var(--line);
@@ -197,6 +197,7 @@ input {
 
 #menu .themes {
   display: flex;
+  flex-wrap: wrap;
   gap: 3px;
   margin: 0 4px 6px;
 }

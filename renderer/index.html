@@ -28,6 +28,14 @@
     <button type="button" id="add" role="menuitem">Add account</button>
     <button type="button" id="refresh" role="menuitem">Refresh</button>
     <button type="button" id="compact" role="menuitem">Compact</button>
+    <p class="menu-label">Refresh every</p>
+    <div class="themes" role="group" aria-label="Refresh every">
+      <button type="button" data-refresh="1" aria-pressed="false">1m</button>
+      <button type="button" data-refresh="5" aria-pressed="true">5m</button>
+      <button type="button" data-refresh="15" aria-pressed="false">15m</button>
+      <button type="button" data-refresh="30" aria-pressed="false">30m</button>
+      <button type="button" data-refresh="0" aria-pressed="false">Off</button>
+    </div>
     <p class="menu-label">Theme</p>
     <div class="themes" role="group" aria-label="Theme">
       <button type="button" data-theme="ion" aria-pressed="true">Ion</button>

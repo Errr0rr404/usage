@@ -239,8 +239,22 @@ ipcMain.handle('window:state', () => ({
   preview,
   form: formPreview ? 'claude' : '',
   theme: store.getSettings().theme || 'ion',
+  refreshMinutes: normalizeRefresh(store.getSettings().refreshMinutes),
   platform: process.platform,
 }));
+
+const REFRESH_MINUTES = new Set([0, 1, 5, 15, 30]);
+
+function normalizeRefresh(value) {
+  const next = Number(value);
+  return REFRESH_MINUTES.has(next) ? next : 5;
+}
+
+ipcMain.handle('window:refresh', (_event, minutes) => {
+  const next = normalizeRefresh(minutes);
+  if (!preview) store.updateSettings({ refreshMinutes: next });
+  return next;
+});
 
 ipcMain.handle('window:theme', (_event, theme) => {
   const next = ['ion', 'ember', 'void'].includes(theme) ? theme : 'ion';

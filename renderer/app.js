@@ -40,6 +40,7 @@ const state = {
   theme: 'ion',
   menuOpen: false,
   platform: 'darwin',
+  refreshMinutes: 5,
 };
 
 const board = document.getElementById('board');
@@ -295,6 +296,9 @@ function renderChrome() {
   document.querySelectorAll('[data-theme]').forEach((button) => {
     button.setAttribute('aria-pressed', button.dataset.theme === state.theme ? 'true' : 'false');
   });
+  document.querySelectorAll('[data-refresh]').forEach((button) => {
+    button.setAttribute('aria-pressed', Number(button.dataset.refresh) === state.refreshMinutes ? 'true' : 'false');
+  });
   document.documentElement.dataset.theme = state.theme;
   document.querySelectorAll('[data-region]').forEach((button) => {
     button.setAttribute('aria-pressed', button.dataset.region === state.region ? 'true' : 'false');
@@ -351,9 +355,16 @@ async function syncCompactSize() {
 }
 
 menu.addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-theme]');
-  if (!button) return;
-  state.theme = await desk.setTheme(button.dataset.theme);
+  const theme = event.target.closest('[data-theme]');
+  if (theme) {
+    state.theme = await desk.setTheme(theme.dataset.theme);
+    renderChrome();
+    return;
+  }
+  const rate = event.target.closest('[data-refresh]');
+  if (!rate) return;
+  state.refreshMinutes = await desk.setRefresh(Number(rate.dataset.refresh));
+  scheduleRefresh();
   renderChrome();
 });
 
@@ -490,6 +501,17 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+let refreshTimer = null;
+
+function scheduleRefresh() {
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = null;
+  if (!state.refreshMinutes) return;
+  refreshTimer = setInterval(() => {
+    if (!state.formOpen && !state.saving) refresh();
+  }, state.refreshMinutes * 60 * 1000);
+}
+
 desk.onAuthHint((hint) => {
   if (!state.saving) return;
   state.hint = hint?.message || '';
@@ -504,14 +526,13 @@ async function init() {
   state.pinned = windowState.pinned !== false;
   state.theme = windowState.theme || 'ion';
   state.platform = windowState.platform || 'darwin';
+  state.refreshMinutes = Number.isFinite(windowState.refreshMinutes) ? windowState.refreshMinutes : 5;
   document.documentElement.dataset.theme = state.theme;
   document.documentElement.dataset.platform = state.platform;
   render();
   await refresh();
   if (windowState.form) openForm(windowState.form);
-  setInterval(() => {
-    if (!state.formOpen) refresh();
-  }, 90000);
+  scheduleRefresh();
 }
 
 init();

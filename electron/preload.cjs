@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('desk', {
   importLogin: (provider) => ipcRenderer.invoke('auth:import', provider),
   chooseAuthFile: (provider) => ipcRenderer.invoke('auth:choose', provider),
   setTheme: (theme) => ipcRenderer.invoke('window:theme', theme),
+  setRefresh: (minutes) => ipcRenderer.invoke('window:refresh', minutes),
   setPinned: (pinned) => ipcRenderer.invoke('window:pin', pinned),
   setCompact: (payload) => ipcRenderer.invoke('window:compact', payload),
   hide: () => ipcRenderer.invoke('window:hide'),

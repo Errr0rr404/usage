@@ -1,7 +1,7 @@
 {
   "name": "usage",
   "productName": "Usage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "author": "Errr0rr404",
   "repository": {
@@ -13,9 +13,9 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test lib/parse.test.cjs lib/login-capture.test.cjs lib/oauth.test.cjs",
-    "dist": "electron-builder",
-    "dist:mac": "electron-builder --mac dmg zip",
-    "dist:win": "electron-builder --win nsis"
+    "dist": "electron-builder --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --arm64 --x64 --publish never",
+    "dist:win": "electron-builder --win nsis --x64 --ia32 --publish never"
   },
   "build": {
     "appId": "app.usage.desktop",
@@ -23,6 +23,7 @@
     "directories": {
       "output": "dist"
     },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [
       "electron/**/*",
       "lib/**/*",
@@ -37,15 +38,38 @@
       "icon": "build/icon.png",
       "identity": null,
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
       ]
     },
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        "nsis"
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
       ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "buildUniversalInstaller": false
     }
   },
   "devDependencies": {
