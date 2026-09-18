@@ -3,6 +3,11 @@
   "productName": "Usage",
   "version": "0.1.0",
   "license": "MIT",
+  "author": "Errr0rr404",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Errr0rr404/usage.git"
+  },
   "description": "Floating desktop meter for Grok, MiniMax, Codex, and Claude usage.",
   "main": "electron/main.cjs",
   "scripts": {
