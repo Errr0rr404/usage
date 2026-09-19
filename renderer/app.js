@@ -27,12 +27,12 @@ const PROVIDERS = [
   {
     id: 'copilot',
     name: 'Copilot',
-    help: 'Your usual browser opens the GitHub device login. The approval page says Visual Studio Code, because that is the public login that can hand a Copilot session back to this computer.',
+    help: 'Your usual browser opens the GitHub device login. The approval page says Visual Studio Code, because that is the public login that can hand a Copilot session back to this computer. GitHub asks for a code. Usage Monitor shows that code in this window and copies it.',
   },
   {
     id: 'gemini',
     name: 'Gemini',
-    help: 'Your usual browser opens the Google login. The approval page says Gemini CLI, because that is the public login that can hand the quota back to this computer. Usage Monitor loads that published client when you sign in, and the session stays here.',
+    help: 'Your usual browser opens the Google login. The approval page says Antigravity, because Google retired the Gemini CLI login for personal accounts. The session stays on this computer.',
   },
 ];
 
@@ -52,6 +52,7 @@ const state = {
   formError: '',
   boardError: '',
   hint: '',
+  deviceCode: '',
   theme: 'ion',
   menuOpen: false,
   platform: 'darwin',
@@ -64,6 +65,7 @@ const footerForm = document.getElementById('footer-form');
 const menu = document.getElementById('menu');
 const settingsButton = document.getElementById('settings');
 const help = document.getElementById('help');
+const deviceCode = document.getElementById('device-code');
 const formError = document.getElementById('form-error');
 const regionField = document.getElementById('region-field');
 const pinButton = document.getElementById('pin');
@@ -300,6 +302,8 @@ function renderChrome() {
   settingsButton.hidden = state.formOpen;
   const selected = PROVIDERS.find((item) => item.id === state.provider) || PROVIDERS[0];
   help.textContent = state.saving && state.hint ? state.hint : selected.help;
+  deviceCode.hidden = !state.deviceCode;
+  deviceCode.textContent = state.deviceCode;
   regionField.hidden = selected.id !== 'minimax';
   document.querySelectorAll('#provider-choices button').forEach((button) => {
     button.setAttribute('aria-pressed', button.dataset.provider === state.provider ? 'true' : 'false');
@@ -339,6 +343,7 @@ function closeForm() {
   state.formError = '';
   state.saving = false;
   state.hint = '';
+  state.deviceCode = '';
   render();
 }
 
@@ -496,6 +501,7 @@ document.getElementById('save').addEventListener('click', async () => {
   state.saving = true;
   state.formError = '';
   state.hint = 'Opening your browser…';
+  state.deviceCode = '';
   renderChrome();
   const result = await desk.signIn({
     provider: state.provider,
@@ -504,6 +510,7 @@ document.getElementById('save').addEventListener('click', async () => {
   });
   state.saving = false;
   state.hint = '';
+  state.deviceCode = '';
   if (result?.canceled) {
     renderChrome();
     return;
@@ -549,6 +556,7 @@ function scheduleRefresh() {
 desk.onAuthHint((hint) => {
   if (!state.saving) return;
   state.hint = hint?.message || '';
+  state.deviceCode = hint?.code || '';
   renderChrome();
 });
 

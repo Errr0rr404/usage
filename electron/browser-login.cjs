@@ -215,10 +215,15 @@ async function signInDevice(region, onProgress, session) {
   if (data.state && data.state !== flow.state) throw new Error('The sign-in handshake did not match. Try again.');
   if (session.canceled) return { ok: false, canceled: true };
   const page = normalizeMinimaxUri(data.verification_uri);
-  await shell.openExternal(page);
   if (onProgress) {
-    onProgress({ message: `Your browser is open. Approve the login there. If it asks for a code, enter ${data.user_code}.` });
+    onProgress({
+      code: data.user_code,
+      message: 'Enter this code on the MiniMax page. It is also copied, so you can paste it.',
+    });
   }
+  await waitFor(session, 700);
+  if (session.canceled) return { ok: false, canceled: true };
+  await shell.openExternal(page);
   const deadline = deadlineFrom(data.expired_in);
   let wait = Number(data.interval) || 3000;
   if (wait < 200) wait *= 1000;
@@ -341,10 +346,15 @@ async function signInCopilot(onProgress, session) {
   const data = await codeResponse.json().catch(() => ({}));
   if (!codeResponse.ok || !data.device_code) throw new Error('GitHub could not start Copilot sign-in. Try again.');
   if (session.canceled) return { ok: false, canceled: true };
-  await shell.openExternal(data.verification_uri_complete || data.verification_uri);
   if (onProgress) {
-    onProgress({ message: `Your browser is open. Approve Copilot access. If it asks for a code, enter ${data.user_code}.` });
+    onProgress({
+      code: data.user_code,
+      message: 'Enter this code on the GitHub page. It is also copied, so you can paste it.',
+    });
   }
+  await waitFor(session, 700);
+  if (session.canceled) return { ok: false, canceled: true };
+  await shell.openExternal(data.verification_uri_complete || data.verification_uri);
   const deadline = Date.now() + (Number(data.expires_in) || 600) * 1000;
   let wait = Math.max(2, Number(data.interval) || 5) * 1000;
   while (Date.now() < deadline) {
@@ -423,14 +433,14 @@ function signIn(provider, options = {}) {
 }
 
 async function loadGeminiClient() {
-  const response = await fetch('https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/code_assist/oauth2.ts', {
+  const response = await fetch('https://raw.githubusercontent.com/NoeFabris/opencode-antigravity-auth/main/src/constants.ts', {
     headers: { Accept: 'text/plain' },
     signal: AbortSignal.timeout(20000),
   });
   if (!response.ok) throw new Error('Gemini sign-in could not reach the public login client. Try again.');
   const text = await response.text();
-  const clientId = text.match(/OAUTH_CLIENT_ID\s*=\s*'([^']+)'/)?.[1];
-  const clientSecret = text.match(/OAUTH_CLIENT_SECRET\s*=\s*'([^']+)'/)?.[1];
+  const clientId = text.match(/ANTIGRAVITY_CLIENT_ID\s*=\s*"([^"]+)"/)?.[1];
+  const clientSecret = text.match(/ANTIGRAVITY_CLIENT_SECRET\s*=\s*"([^"]+)"/)?.[1];
   if (!clientId || !clientSecret) throw new Error('Gemini sign-in could not read the public login client. Try again.');
   return { clientId, clientSecret };
 }

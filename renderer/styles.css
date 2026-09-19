@@ -463,6 +463,15 @@ input {
   font-size: 10px;
 }
 
+.device-code {
+  margin: 10px 0 0;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-align: center;
+  color: var(--ink);
+}
+
 footer {
   display: flex;
   gap: 4px;

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, dialog, ipcMain, nativeImage, Notification } = require('electron');
+const { app, BrowserWindow, Tray, Menu, dialog, ipcMain, nativeImage, Notification, clipboard } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -359,6 +359,10 @@ ipcMain.handle('auth:signin', async (_event, payload) => {
     const result = await signIn(provider, {
       region: payload?.region,
       onProgress: (hint) => {
+        if (hint?.code) {
+          clipboard.writeText(String(hint.code));
+          showWindow();
+        }
         if (win && !win.isDestroyed()) win.webContents.send('auth:hint', hint);
       },
     });

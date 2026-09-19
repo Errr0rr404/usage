@@ -21,7 +21,7 @@ Usage Monitor refreshes every 5 minutes. Change that, or turn it off, from the s
 
 ## Sign in
 
-Each service opens the public login that can hand a session back to an app on this computer. The approval page may say Grok CLI, MiniMax CLI, Codex, Claude Code, Cursor, Visual Studio Code, or Gemini CLI. That is expected. Usage Monitor does not have its own account, and it does not send your login anywhere except the service you picked.
+Each service opens the public login that can hand a session back to an app on this computer. The approval page may say Grok CLI, MiniMax CLI, Codex, Claude Code, Cursor, Visual Studio Code, or Antigravity. That is expected. Usage Monitor does not have its own account, and it does not send your login anywhere except the service you picked.
 
 The menu bar icon shows the lowest amount left. If a window drops under 15 percent, Usage Monitor sends one notification. It does not ping again until that window recovers and drops again.
 
