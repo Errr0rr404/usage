@@ -19,9 +19,24 @@ const PROVIDERS = [
     name: 'Claude',
     help: 'Your usual browser opens the Claude login. The approval page says Claude Code, because that is the public login that can hand the session back to this computer. The session stays here.',
   },
+  {
+    id: 'cursor',
+    name: 'Cursor',
+    help: 'Your usual browser opens the Cursor login. Approve it there and the session comes back to this computer. Usage does not read your browser cookies.',
+  },
+  {
+    id: 'copilot',
+    name: 'Copilot',
+    help: 'Your usual browser opens the GitHub device login. The approval page says Visual Studio Code, because that is the public login that can hand a Copilot session back to this computer.',
+  },
+  {
+    id: 'gemini',
+    name: 'Gemini',
+    help: 'Your usual browser opens the Google login. The approval page says Gemini CLI, because that is the public login that can hand the quota back to this computer. Usage loads that published client when you sign in, and the session stays here.',
+  },
 ];
 
-const ORDER = ['grok', 'minimax', 'codex', 'claude'];
+const ORDER = ['grok', 'minimax', 'codex', 'claude', 'cursor', 'copilot', 'gemini'];
 
 const state = {
   accounts: [],
@@ -201,9 +216,6 @@ function renderMeter(window) {
 function renderAccount(account) {
   const snapshot = state.snapshots[account.id];
   const plan = titlePlan(snapshot?.plan);
-  const identity = snapshot?.identity && snapshot.identity !== account.label
-    ? `<p class="identity">${esc(snapshot.identity)}</p>`
-    : '';
   const confirming = state.pendingRemove === account.id;
   const actions = `<button type="button" class="${confirming ? 'danger' : ''}" data-remove="${esc(account.id)}">${confirming ? 'Confirm remove' : 'Remove'}</button>`;
   let body = '<p class="meter-note">Checking…</p>';
@@ -216,10 +228,9 @@ function renderAccount(account) {
 
   return `<article class="account">
     <div class="account-head">
-      <h3>${esc(account.label)}${plan ? ` <span class="plan">${esc(plan)}</span>` : ''}</h3>
+      <h3>${plan ? esc(plan) : ''}</h3>
       <div class="account-actions">${actions}</div>
     </div>
-    ${identity}
     ${body}
   </article>`;
 }
@@ -250,7 +261,7 @@ function renderBoard() {
           reading = `${window.label} ${view.value}${view.unit ? ` ${view.unit}` : ''}`;
         }
       }
-      return `<div class="compact-row"><strong>${esc(providerName(account.provider))} ${esc(account.label)}</strong><span>${esc(reading)}</span></div>`;
+      return `<div class="compact-row"><strong>${esc(providerName(account.provider))}</strong><span>${esc(reading)}</span></div>`;
     }).join('');
     return;
   }
@@ -349,8 +360,31 @@ async function refresh() {
   }
 }
 
+function measureCompactHeight() {
+  const panel = document.getElementById('panel');
+  const boardEl = document.getElementById('board');
+  const previous = {
+    panelHeight: panel.style.height,
+    boardFlex: boardEl.style.flex,
+    boardOverflow: boardEl.style.overflow,
+  };
+  panel.style.height = 'auto';
+  boardEl.style.flex = '0 0 auto';
+  boardEl.style.overflow = 'visible';
+  const bodyStyle = getComputedStyle(document.body);
+  const extra = (parseFloat(bodyStyle.paddingTop) || 0) + (parseFloat(bodyStyle.paddingBottom) || 0);
+  const height = Math.ceil(panel.getBoundingClientRect().height + extra + 2);
+  panel.style.height = previous.panelHeight;
+  boardEl.style.flex = previous.boardFlex;
+  boardEl.style.overflow = previous.boardOverflow;
+  return height;
+}
+
 async function syncCompactSize() {
-  const height = 150 + Math.max(1, state.accounts.length) * 36;
+  if (state.compact) {
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }
+  const height = state.compact ? measureCompactHeight() : 0;
   await desk.setCompact({ compact: state.compact, height });
 }
 
@@ -521,7 +555,9 @@ desk.onAuthHint((hint) => {
 desk.onRefreshRequest(() => refresh());
 
 async function init() {
-  if (new URLSearchParams(location.search).get('menu') === '1') state.menuOpen = true;
+  const query = new URLSearchParams(location.search);
+  if (query.get('menu') === '1') state.menuOpen = true;
+  if (query.get('compact') === '1') state.compact = true;
   const windowState = await desk.getState();
   state.pinned = windowState.pinned !== false;
   state.theme = windowState.theme || 'ion';

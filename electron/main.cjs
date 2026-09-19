@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, dialog, ipcMain, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, dialog, ipcMain, nativeImage, Notification } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -15,7 +15,7 @@ const windows = process.platform === 'win32';
 const preview = process.argv.includes('--preview') || process.argv.includes('--shot');
 const emptyPreview = process.argv.includes('--empty');
 const formPreview = process.argv.includes('--form');
-const PROVIDERS = new Set(['grok', 'minimax', 'codex', 'claude']);
+const PROVIDERS = new Set(['grok', 'minimax', 'codex', 'claude', 'cursor', 'copilot', 'gemini']);
 
 app.setName('Usage');
 if (windows) app.setAppUserModelId('app.usage.desktop');
@@ -25,6 +25,52 @@ let tray = null;
 let normalBounds = null;
 let compact = false;
 let refreshing = null;
+const limitState = new Map();
+
+function remainingLeft(window) {
+  if (!window || window.unit === 'unlimited' || window.unit === 'credits' || window.usedPercent == null) return null;
+  return Math.max(0, 100 - window.usedPercent);
+}
+
+function updateTray(result) {
+  if (!tray || !result) return;
+  let lowest = null;
+  let lowestName = '';
+  for (const account of result.accounts || []) {
+    const snapshot = result.snapshots?.[account.id];
+    if (!snapshot?.ok) continue;
+    for (const window of snapshot.windows || []) {
+      const left = remainingLeft(window);
+      if (left == null) continue;
+      if (lowest == null || left < lowest) {
+        lowest = left;
+        lowestName = `${providerName(account.provider)} ${window.label}`;
+      }
+    }
+  }
+  const title = lowest == null ? 'Usage' : `${lowestName} ${Math.round(lowest)}% left`;
+  tray.setToolTip(title);
+  if (darwin) tray.setTitle(lowest == null ? '' : `${Math.round(lowest)}%`);
+  if (!Notification.isSupported()) return;
+  for (const account of result.accounts || []) {
+    const snapshot = result.snapshots?.[account.id];
+    if (!snapshot?.ok) continue;
+    for (const window of snapshot.windows || []) {
+      const left = remainingLeft(window);
+      if (left == null) continue;
+      const key = `${account.id}:${window.key}`;
+      const low = left < 15;
+      const previous = limitState.get(key);
+      limitState.set(key, low ? 'low' : 'ok');
+      if (previous === 'ok' && low) {
+        new Notification({
+          title: 'Usage is running low',
+          body: `${providerName(account.provider)} ${window.label} has ${Math.round(left)}% left.`,
+        }).show();
+      }
+    }
+  }
+}
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -128,9 +174,10 @@ function createWindow() {
 
   if (settings.pinned !== false) pinWindow(win, true);
 
-  win.loadFile(path.join(__dirname, '../renderer/index.html'), {
-    query: process.argv.includes('--menu') ? { menu: '1' } : {},
-  });
+  const query = {};
+  if (process.argv.includes('--menu')) query.menu = '1';
+  if (process.argv.includes('--compact')) query.compact = '1';
+  win.loadFile(path.join(__dirname, '../renderer/index.html'), { query });
   win.once('ready-to-show', () => win.show());
   win.on('close', (event) => {
     if (preview) return;
@@ -144,7 +191,7 @@ function createWindow() {
 
   if (process.argv.includes('--shot')) {
     win.webContents.once('did-finish-load', async () => {
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await new Promise((resolve) => setTimeout(resolve, process.argv.includes('--compact') ? 1600 : 700));
       const image = await win.webContents.capturePage();
       fs.writeFileSync(path.join(os.tmpdir(), 'usage-preview.png'), image.toPNG());
       app.exit(0);
@@ -179,7 +226,9 @@ async function refreshAll() {
       }
       snapshots[account.id] = await fetchUsage(account, secret);
     }));
-    return { accounts: store.listPublic(), snapshots };
+    const result = { accounts: store.listPublic(), snapshots };
+    updateTray(result);
+    return result;
   })().finally(() => {
     refreshing = null;
   });
@@ -273,17 +322,24 @@ ipcMain.handle('window:pin', (_event, pinned) => {
 ipcMain.handle('window:compact', (_event, payload) => {
   if (!win) return false;
   const next = Boolean(payload?.compact);
-  const height = Math.max(220, Math.min(520, Number(payload?.height) || 320));
-  if (next && !compact) {
-    normalBounds = win.getBounds();
-    compact = true;
-    win.setSize(normalBounds.width, height, false);
-  } else if (!next && compact) {
-    compact = false;
-    if (normalBounds) win.setBounds(normalBounds);
-    normalBounds = null;
+  const height = Math.max(88, Math.min(720, Math.round(Number(payload?.height) || 140)));
+  if (next) {
+    if (!compact) {
+      normalBounds = win.getBounds();
+      compact = true;
+    }
+    win.setMinimumSize(280, 88);
+    win.setSize(normalBounds?.width || win.getBounds().width, height, false);
+    return true;
   }
-  return compact;
+  if (compact) {
+    compact = false;
+    const restore = normalBounds;
+    normalBounds = null;
+    if (restore) win.setBounds(restore);
+    win.setMinimumSize(280, 240);
+  }
+  return false;
 });
 
 ipcMain.handle('window:hide', () => {
@@ -296,7 +352,7 @@ ipcMain.handle('usage:refresh', () => refreshAll());
 ipcMain.handle('auth:signin', async (_event, payload) => {
   if (preview) return { ok: false, error: 'Preview mode does not sign in.' };
   const provider = payload?.provider;
-  if (!PROVIDERS.has(provider)) return { ok: false, error: 'Choose Grok, MiniMax, Codex, or Claude.' };
+  if (!PROVIDERS.has(provider)) return { ok: false, error: 'Choose a service first.' };
   const wasOnTop = win ? win.isAlwaysOnTop() : false;
   if (win) win.setAlwaysOnTop(false);
   try {
@@ -341,7 +397,7 @@ ipcMain.handle('accounts:add', (_event, payload) => {
   const provider = payload?.provider;
   const secret = cleanSecret(payload?.secret);
   const label = String(payload?.label || '').trim();
-  if (!PROVIDERS.has(provider)) return { ok: false, error: 'Choose Grok, MiniMax, Codex, or Claude.' };
+  if (!PROVIDERS.has(provider)) return { ok: false, error: 'Choose a service first.' };
   if (!secret) return { ok: false, error: 'Paste a login first.' };
   try {
     const meta = {};
@@ -404,7 +460,15 @@ ipcMain.handle('auth:choose', async (_event, provider) => {
 });
 
 function providerName(id) {
-  return { grok: 'Grok', minimax: 'MiniMax', codex: 'Codex', claude: 'Claude' }[id] || 'Account';
+  return {
+    grok: 'Grok',
+    minimax: 'MiniMax',
+    codex: 'Codex',
+    claude: 'Claude',
+    cursor: 'Cursor',
+    copilot: 'Copilot',
+    gemini: 'Gemini',
+  }[id] || 'Account';
 }
 
 app.whenReady().then(() => {

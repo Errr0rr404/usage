@@ -1,6 +1,8 @@
 # Usage
 
-A small floating desktop meter for Grok, MiniMax, Codex, and Claude. Sign in with your usual browser. Usage reads what is left on each account and keeps the session on this computer.
+A small floating desktop meter for Grok, MiniMax, Codex, Claude, Cursor, Copilot, and Gemini. Sign in with your usual browser. Usage reads what is left on each account and keeps the session on this computer.
+
+![Usage, with Grok, MiniMax, Codex, and Cursor on one board](docs/screenshot.jpg)
 
 It runs on macOS and Windows.
 
@@ -19,7 +21,9 @@ Usage refreshes every 5 minutes. Change that, or turn it off, from the settings 
 
 ## Sign in
 
-Each service opens the public login that can hand a session back to an app on this computer. The approval page may say Grok CLI, MiniMax CLI, Codex, or Claude Code. That is expected. Usage does not have its own account, and it does not send your login anywhere except the service you picked.
+Each service opens the public login that can hand a session back to an app on this computer. The approval page may say Grok CLI, MiniMax CLI, Codex, Claude Code, Cursor, Visual Studio Code, or Gemini CLI. That is expected. Usage does not have its own account, and it does not send your login anywhere except the service you picked.
+
+The menu bar icon shows the lowest amount left. If a window drops under 15 percent, Usage sends one notification. It does not ping again until that window recovers and drops again.
 
 Sessions are locked with the operating system: the macOS keychain, or Windows DPAPI.
 

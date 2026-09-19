@@ -1,4 +1,5 @@
 const http = require('http');
+const crypto = require('crypto');
 const { shell } = require('electron');
 const { decodeJwt } = require('../lib/parse.cjs');
 const {
@@ -67,23 +68,27 @@ async function exchange(spec, { code, verifier, state }) {
   let body;
   if (spec.tokenStyle === 'json') {
     headers['Content-Type'] = 'application/json';
-    body = JSON.stringify({
+    const payload = {
       grant_type: 'authorization_code',
       code,
       redirect_uri: spec.redirect,
       client_id: spec.clientId,
       code_verifier: verifier,
       state,
-    });
+    };
+    if (spec.clientSecret) payload.client_secret = spec.clientSecret;
+    body = JSON.stringify(payload);
   } else {
     headers['Content-Type'] = 'application/x-www-form-urlencoded';
-    body = new URLSearchParams({
+    const fields = {
       grant_type: 'authorization_code',
       code,
       redirect_uri: spec.redirect,
       client_id: spec.clientId,
       code_verifier: verifier,
-    }).toString();
+    };
+    if (spec.clientSecret) fields.client_secret = spec.clientSecret;
+    body = new URLSearchParams(fields).toString();
   }
   const response = await fetch(spec.token, { method: 'POST', headers, body, signal: AbortSignal.timeout(20000) });
   const text = await response.text();
@@ -260,6 +265,118 @@ async function signInDevice(region, onProgress, session) {
   throw new Error('Sign-in took too long. Try again.');
 }
 
+function waitFor(session, ms) {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    session.finish = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+  });
+}
+
+async function signInCursor(onProgress, session) {
+  const flow = pkce();
+  const uuid = crypto.randomUUID();
+  const url = `${PROVIDERS.cursor.login}?${new URLSearchParams({
+    challenge: flow.challenge,
+    uuid,
+    mode: 'login',
+    redirectTarget: 'cli',
+  })}`;
+  if (session.canceled) return { ok: false, canceled: true };
+  await shell.openExternal(url);
+  if (onProgress) onProgress({ message: 'Your browser is open. Sign in to Cursor and approve the login.' });
+  const deadline = Date.now() + 6 * 60 * 1000;
+  let useGet = false;
+  while (Date.now() < deadline) {
+    if (session.canceled) return { ok: false, canceled: true };
+    await waitFor(session, 1200);
+    if (session.canceled) return { ok: false, canceled: true };
+    const response = useGet
+      ? await fetch(`${PROVIDERS.cursor.poll}?uuid=${encodeURIComponent(uuid)}&verifier=${encodeURIComponent(flow.verifier)}`, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(20000),
+      })
+      : await fetch(PROVIDERS.cursor.poll, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uuid, verifier: flow.verifier }),
+        signal: AbortSignal.timeout(20000),
+      });
+    const text = await response.text();
+    if (response.status === 404) {
+      if (!useGet && /cannot post|<!doctype|<html/i.test(text)) useGet = true;
+      continue;
+    }
+    let token = {};
+    try {
+      token = JSON.parse(text);
+    } catch {
+      token = {};
+    }
+    const access = token.accessToken || token.access_token;
+    if (access) {
+      const payload = decodeJwt(access) || {};
+      return {
+        ok: true,
+        secret: bundleSecret({ access_token: access, refresh_token: token.refreshToken || token.refresh_token || '' }),
+        email: payload.email || null,
+        accountId: payload.sub || null,
+      };
+    }
+    if (!response.ok && response.status !== 202) throw new Error('Cursor rejected the sign-in handshake.');
+  }
+  throw new Error('Sign-in took too long. Try again.');
+}
+
+async function signInCopilot(onProgress, session) {
+  const spec = PROVIDERS.copilot;
+  const codeResponse = await fetch(spec.device, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: spec.clientId, scope: spec.scope }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const data = await codeResponse.json().catch(() => ({}));
+  if (!codeResponse.ok || !data.device_code) throw new Error('GitHub could not start Copilot sign-in. Try again.');
+  if (session.canceled) return { ok: false, canceled: true };
+  await shell.openExternal(data.verification_uri_complete || data.verification_uri);
+  if (onProgress) {
+    onProgress({ message: `Your browser is open. Approve Copilot access. If it asks for a code, enter ${data.user_code}.` });
+  }
+  const deadline = Date.now() + (Number(data.expires_in) || 600) * 1000;
+  let wait = Math.max(2, Number(data.interval) || 5) * 1000;
+  while (Date.now() < deadline) {
+    if (session.canceled) return { ok: false, canceled: true };
+    await waitFor(session, wait);
+    if (session.canceled) return { ok: false, canceled: true };
+    const tokenResponse = await fetch(spec.token, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: spec.clientId,
+        device_code: data.device_code,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const token = await tokenResponse.json().catch(() => ({}));
+    if (token.error === 'authorization_pending') continue;
+    if (token.error === 'slow_down') {
+      wait = Math.min(wait + 5000, 20000);
+      continue;
+    }
+    if (token.error === 'access_denied') return { ok: false, canceled: true };
+    if (token.error === 'expired_token') throw new Error('Sign-in took too long. Try again.');
+    if (token.access_token) {
+      return { ok: true, secret: bundleSecret(token), email: null, accountId: null };
+    }
+    if (!tokenResponse.ok) throw new Error('GitHub rejected the Copilot sign-in.');
+  }
+  throw new Error('Sign-in took too long. Try again.');
+}
+
 function signIn(provider, options = {}) {
   const onProgress = options.onProgress;
   if (provider === 'minimax') {
@@ -274,10 +391,48 @@ function signIn(provider, options = {}) {
         if (current === session) current = null;
       });
   }
+  if (provider === 'cursor' || provider === 'copilot') {
+    const session = { canceled: false, finish: null };
+    current = session;
+    const run = provider === 'cursor' ? signInCursor(onProgress, session) : signInCopilot(onProgress, session);
+    return run
+      .catch((error) => ({
+        ok: false,
+        error: error.message || 'Sign-in could not finish.',
+      }))
+      .finally(() => {
+        if (current === session) current = null;
+      });
+  }
   if (!PROVIDERS[provider] || PROVIDERS[provider].mode !== 'loopback') {
     return Promise.resolve({ ok: false, error: 'Choose a service first.' });
   }
+  if (provider === 'gemini') {
+    return loadGeminiClient()
+      .then((client) => {
+        PROVIDERS.gemini.clientId = client.clientId;
+        PROVIDERS.gemini.clientSecret = client.clientSecret;
+        return signInLoopback(provider, onProgress);
+      })
+      .catch((error) => ({
+        ok: false,
+        error: error.message || 'Gemini sign-in could not start.',
+      }));
+  }
   return signInLoopback(provider, onProgress);
+}
+
+async function loadGeminiClient() {
+  const response = await fetch('https://raw.githubusercontent.com/google-gemini/gemini-cli/main/packages/core/src/code_assist/oauth2.ts', {
+    headers: { Accept: 'text/plain' },
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!response.ok) throw new Error('Gemini sign-in could not reach the public login client. Try again.');
+  const text = await response.text();
+  const clientId = text.match(/OAUTH_CLIENT_ID\s*=\s*'([^']+)'/)?.[1];
+  const clientSecret = text.match(/OAUTH_CLIENT_SECRET\s*=\s*'([^']+)'/)?.[1];
+  if (!clientId || !clientSecret) throw new Error('Gemini sign-in could not read the public login client. Try again.');
+  return { clientId, clientSecret };
 }
 
 function cancelSignIn() {
