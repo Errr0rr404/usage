@@ -263,7 +263,7 @@ footer button:hover,
 
 .account-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 6px;
 }
@@ -287,8 +287,7 @@ footer button:hover,
 }
 
 .identity,
-.invert,
-.account-actions button {
+.invert {
   color: var(--quiet);
   font-size: 10px;
 }
@@ -297,12 +296,20 @@ footer button:hover,
 
 .account-actions {
   display: flex;
-  gap: 8px;
+  gap: 1px;
   flex: none;
-  white-space: nowrap;
 }
 
 .invert { margin-top: 2px; }
+
+.account-actions button {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--quiet);
+  border-radius: 5px;
+}
 
 .account-actions button[data-default][aria-pressed="true"] {
   color: var(--accent);

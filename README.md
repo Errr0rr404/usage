@@ -11,7 +11,7 @@ It runs on macOS and Windows.
 The menu bar on a Mac, and the tray icon on Windows, show one account.
 
 - One signed-in account is used automatically.
-- With more than one, choose **Set default** on the account you want up there. That reading stays until you pick another.
+- With more than one, tap the star on the account you want up there. That reading stays until you pick another.
 
 Hide sends the window to that icon. Quit from the icon. Keep on top, in the settings menu, holds the window above other apps. On macOS it also stays visible on every desktop.
 

@@ -83,6 +83,15 @@ function esc(value) {
   }[char]));
 }
 
+function iconStar(filled) {
+  const fill = filled ? 'currentColor' : 'none';
+  return `<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.9 9.7 5.4l3.8.6-2.8 2.7.7 3.8L8 10.7 4.6 12.5l.7-3.8L2.5 6l3.8-.6z" fill="${fill}" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"></path></svg>`;
+}
+
+function iconClose() {
+  return `<svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2 11.8 11.8M11.8 4.2 4.2 11.8" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"></path></svg>`;
+}
+
 function providerName(id) {
   return PROVIDERS.find((item) => item.id === id)?.name || 'Account';
 }
@@ -220,10 +229,12 @@ function renderAccount(account) {
   const plan = titlePlan(snapshot?.plan);
   const confirming = state.pendingRemove === account.id;
   const canChooseDefault = state.accounts.length > 1;
+  const defaultLabel = account.isDefault ? 'Default' : 'Set default';
   const defaultAction = canChooseDefault
-    ? `<button type="button" data-default="${esc(account.id)}" aria-pressed="${account.isDefault ? 'true' : 'false'}">${account.isDefault ? 'Default' : 'Set default'}</button>`
+    ? `<button type="button" data-default="${esc(account.id)}" aria-pressed="${account.isDefault ? 'true' : 'false'}" aria-label="${defaultLabel}" title="${defaultLabel}">${iconStar(account.isDefault)}</button>`
     : '';
-  const actions = `${defaultAction}<button type="button" class="${confirming ? 'danger' : ''}" data-remove="${esc(account.id)}">${confirming ? 'Confirm remove' : 'Remove'}</button>`;
+  const removeLabel = confirming ? 'Confirm remove' : 'Remove';
+  const actions = `${defaultAction}<button type="button" class="${confirming ? 'danger' : ''}" data-remove="${esc(account.id)}" aria-label="${removeLabel}" title="${removeLabel}">${iconClose()}</button>`;
   let body = '<p class="meter-note">Checking…</p>';
   if (snapshot?.ok === false) body = `<p class="error">${esc(snapshot.error || 'Could not load usage.')}</p>`;
   else if (snapshot?.ok) {
