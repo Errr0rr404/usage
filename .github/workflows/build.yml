@@ -44,7 +44,7 @@ jobs:
       - run: npm run ${{ matrix.script }}
       - uses: actions/upload-artifact@v4
         with:
-          name: usage-${{ matrix.os }}
+          name: usage-monitor-${{ matrix.os }}
           path: |
             dist/*.dmg
             dist/*.zip
@@ -68,7 +68,7 @@ jobs:
         run: |
           set -eu
           version="${GITHUB_REF_NAME#v}"
-          expected="Usage-${version}-mac-arm64.dmg Usage-${version}-mac-x64.dmg Usage-${version}-mac-arm64.zip Usage-${version}-mac-x64.zip Usage-${version}-win-x64.exe Usage-${version}-win-ia32.exe"
+          expected="Usage-Monitor-${version}-mac-arm64.dmg Usage-Monitor-${version}-mac-x64.dmg Usage-Monitor-${version}-mac-arm64.zip Usage-Monitor-${version}-mac-x64.zip Usage-Monitor-${version}-win-x64.exe Usage-Monitor-${version}-win-ia32.exe"
           missing=""
           for name in $expected; do
             if [ ! -f "release-assets/${name}" ]; then
@@ -83,21 +83,21 @@ jobs:
           notes=$(cat <<EOF
           Install the file that matches your computer.
 
-          - Mac with Apple silicon: \`Usage-${version}-mac-arm64.dmg\`
-          - Mac with Intel: \`Usage-${version}-mac-x64.dmg\`
-          - Windows 64-bit: \`Usage-${version}-win-x64.exe\`
-          - Windows 32-bit: \`Usage-${version}-win-ia32.exe\`
+          - Mac with Apple silicon: \`Usage-Monitor-${version}-mac-arm64.dmg\`
+          - Mac with Intel: \`Usage-Monitor-${version}-mac-x64.dmg\`
+          - Windows 64-bit: \`Usage-Monitor-${version}-win-x64.exe\`
+          - Windows 32-bit: \`Usage-Monitor-${version}-win-ia32.exe\`
 
           The zip files are the same Mac apps without a disk image.
 
-          These builds are not signed. On a Mac, Control-click Usage the first time and choose Open. On Windows, if SmartScreen appears, choose More info, then Run anyway.
+          These builds are not signed. On a Mac, Control-click Usage Monitor the first time and choose Open. On Windows, if SmartScreen appears, choose More info, then Run anyway.
           EOF
           )
           notes=$(printf '%s\n' "$notes" | sed 's/^          //')
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release-assets/Usage-${version}-* --clobber
+            gh release upload "$GITHUB_REF_NAME" release-assets/Usage-Monitor-${version}-* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release-assets/Usage-${version}-* \
-              --title "Usage ${version}" \
+            gh release create "$GITHUB_REF_NAME" release-assets/Usage-Monitor-${version}-* \
+              --title "Usage Monitor ${version}" \
               --notes "$notes"
           fi

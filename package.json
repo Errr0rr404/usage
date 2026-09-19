@@ -1,12 +1,12 @@
 {
-  "name": "usage",
-  "productName": "Usage",
+  "name": "usage-monitor",
+  "productName": "Usage Monitor",
   "version": "0.2.0",
   "license": "MIT",
   "author": "Errr0rr404",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Errr0rr404/usage.git"
+    "url": "https://github.com/Errr0rr404/usage-monitor.git"
   },
   "description": "Floating desktop meter for Grok, MiniMax, Codex, and Claude usage.",
   "main": "electron/main.cjs",
@@ -18,12 +18,12 @@
     "dist:win": "electron-builder --win nsis --x64 --ia32 --publish never"
   },
   "build": {
-    "appId": "app.usage.desktop",
-    "productName": "Usage",
+    "appId": "app.usage.monitor",
+    "productName": "Usage Monitor",
     "directories": {
       "output": "dist"
     },
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "artifactName": "Usage-Monitor-${version}-${os}-${arch}.${ext}",
     "files": [
       "electron/**/*",
       "lib/**/*",

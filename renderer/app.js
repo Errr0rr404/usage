@@ -7,7 +7,7 @@ const PROVIDERS = [
   {
     id: 'minimax',
     name: 'MiniMax',
-    help: 'Your usual browser opens the MiniMax login for the region you picked. The approval page says MiniMax CLI. If it asks for a code, Usage shows it here. The session stays on this computer.',
+    help: 'Your usual browser opens the MiniMax login for the region you picked. The approval page says MiniMax CLI. If it asks for a code, Usage Monitor shows it here. The session stays on this computer.',
   },
   {
     id: 'codex',
@@ -22,7 +22,7 @@ const PROVIDERS = [
   {
     id: 'cursor',
     name: 'Cursor',
-    help: 'Your usual browser opens the Cursor login. Approve it there and the session comes back to this computer. Usage does not read your browser cookies.',
+    help: 'Your usual browser opens the Cursor login. Approve it there and the session comes back to this computer. Usage Monitor does not read your browser cookies.',
   },
   {
     id: 'copilot',
@@ -32,7 +32,7 @@ const PROVIDERS = [
   {
     id: 'gemini',
     name: 'Gemini',
-    help: 'Your usual browser opens the Google login. The approval page says Gemini CLI, because that is the public login that can hand the quota back to this computer. Usage loads that published client when you sign in, and the session stays here.',
+    help: 'Your usual browser opens the Google login. The approval page says Gemini CLI, because that is the public login that can hand the quota back to this computer. Usage Monitor loads that published client when you sign in, and the session stays here.',
   },
 ];
 
@@ -240,7 +240,7 @@ function renderBoard() {
   if (!state.accounts.length) {
     board.innerHTML = `<div class="empty">
       ${state.boardError ? `<p class="error">${esc(state.boardError)}</p>` : ''}
-      <p>Add an account to see what is left. Each service can hold more than one login. Hide keeps Usage running in the background.</p>
+      <p>Add an account to see what is left. Each service can hold more than one login. Hide keeps Usage Monitor running in the background.</p>
       <div class="choice-grid">
         ${PROVIDERS.map((item) => `<button type="button" data-open="${item.id}">${item.name}</button>`).join('')}
       </div>
@@ -352,7 +352,7 @@ async function refresh() {
     state.accounts = result.accounts || [];
     state.snapshots = result.snapshots || {};
   } catch {
-    state.boardError = 'Usage could not refresh.';
+    state.boardError = 'Usage Monitor could not refresh.';
   } finally {
     state.refreshing = false;
     render();

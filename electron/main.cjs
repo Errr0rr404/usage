@@ -17,8 +17,8 @@ const emptyPreview = process.argv.includes('--empty');
 const formPreview = process.argv.includes('--form');
 const PROVIDERS = new Set(['grok', 'minimax', 'codex', 'claude', 'cursor', 'copilot', 'gemini']);
 
-app.setName('Usage');
-if (windows) app.setAppUserModelId('app.usage.desktop');
+app.setName('Usage Monitor');
+if (windows) app.setAppUserModelId('app.usage.monitor');
 
 let win = null;
 let tray = null;
@@ -48,7 +48,7 @@ function updateTray(result) {
       }
     }
   }
-  const title = lowest == null ? 'Usage' : `${lowestName} ${Math.round(lowest)}% left`;
+  const title = lowest == null ? 'Usage Monitor' : `${lowestName} ${Math.round(lowest)}% left`;
   tray.setToolTip(title);
   if (darwin) tray.setTitle(lowest == null ? '' : `${Math.round(lowest)}%`);
   if (!Notification.isSupported()) return;
@@ -64,7 +64,7 @@ function updateTray(result) {
       limitState.set(key, low ? 'low' : 'ok');
       if (previous === 'ok' && low) {
         new Notification({
-          title: 'Usage is running low',
+          title: 'Usage Monitor is running low',
           body: `${providerName(account.provider)} ${window.label} has ${Math.round(left)}% left.`,
         }).show();
       }
@@ -116,9 +116,9 @@ function createTray() {
     icon.addRepresentation({ scaleFactor: 2, width: 32, height: 32, buffer: trayPng(32, [255, 255, 255]) });
   }
   tray = new Tray(icon);
-  tray.setToolTip('Usage');
+  tray.setToolTip('Usage Monitor');
   const menu = Menu.buildFromTemplate([
-    { label: 'Show Usage', click: showWindow },
+    { label: 'Show Usage Monitor', click: showWindow },
     { label: 'Refresh', click: () => { showWindow(); if (win) win.webContents.send('usage:refresh-request'); } },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
@@ -161,7 +161,7 @@ function createWindow() {
     alwaysOnTop: settings.pinned !== false,
     hasShadow: true,
     roundedCorners: true,
-    title: 'Usage',
+    title: 'Usage Monitor',
     icon: path.join(__dirname, '../build/icon.png'),
     backgroundColor: windows ? '#070b10' : '#00000000',
     webPreferences: {

@@ -142,13 +142,13 @@ function signInLoopback(provider, onProgress) {
       }
       if (requestUrl.searchParams.get('state') !== flow.state) {
         response.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-        response.end(htmlPage('Sign-in stopped', 'This sign-in did not match the one Usage started.'));
+        response.end(htmlPage('Sign-in stopped', 'This sign-in did not match the one Usage Monitor started.'));
         finish({ ok: false, error: 'The sign-in handshake did not match. Try again.' });
         return;
       }
       if (received) {
         response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        response.end(htmlPage('Signed in', 'Signed in. You can close this tab and return to Usage.'));
+        response.end(htmlPage('Signed in', 'Signed in. You can close this tab and return to Usage Monitor.'));
         return;
       }
       received = true;
@@ -160,7 +160,7 @@ function signInLoopback(provider, onProgress) {
         return;
       }
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end(htmlPage('Signed in', 'Signed in. You can close this tab and return to Usage.'));
+      response.end(htmlPage('Signed in', 'Signed in. You can close this tab and return to Usage Monitor.'));
       exchange(spec, { code, verifier: flow.verifier, state: flow.state })
         .then((tokens) => {
           const identity = emailFromToken(tokens.access_token);
