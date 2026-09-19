@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('desk', {
   refresh: () => ipcRenderer.invoke('usage:refresh'),
   addAccount: (payload) => ipcRenderer.invoke('accounts:add', payload),
   updateAccount: (id, patch) => ipcRenderer.invoke('accounts:update', id, patch),
+  setDefaultAccount: (id) => ipcRenderer.invoke('accounts:default', id),
   removeAccount: (id) => ipcRenderer.invoke('accounts:remove', id),
   signIn: (payload) => ipcRenderer.invoke('auth:signin', payload),
   cancelSignIn: () => ipcRenderer.invoke('auth:cancel'),

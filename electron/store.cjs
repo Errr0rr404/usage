@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { app, safeStorage } = require('electron');
 const { sessionFromSecret } = require('../lib/oauth.cjs');
+const { resolveDefaultId } = require('../lib/tray.cjs');
 
 function dataFile() {
   return path.join(app.getPath('userData'), 'accounts.json');
@@ -10,7 +11,7 @@ function dataFile() {
 
 function emptyState() {
   return {
-    settings: { pinned: true, bounds: null },
+    settings: { pinned: true, bounds: null, defaultAccountId: null },
     accounts: [],
   };
 }
@@ -20,7 +21,7 @@ function readState() {
     const raw = fs.readFileSync(dataFile(), 'utf8');
     const parsed = JSON.parse(raw);
     return {
-      settings: { pinned: true, bounds: null, ...(parsed.settings || {}) },
+      settings: { pinned: true, bounds: null, defaultAccountId: null, ...(parsed.settings || {}) },
       accounts: Array.isArray(parsed.accounts) ? parsed.accounts : [],
     };
   } catch {
@@ -32,9 +33,18 @@ function writeState(state) {
   const file = dataFile();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const next = `${JSON.stringify(state, null, 2)}\n`;
-  const tmp = `${file}.tmp`;
+  const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, next);
-  fs.renameSync(tmp, file);
+  try {
+    fs.renameSync(tmp, file);
+  } catch {
+    fs.copyFileSync(tmp, file);
+    try {
+      fs.unlinkSync(tmp);
+    } catch {
+      // Windows can leave the temp file if the destination was locked.
+    }
+  }
 }
 
 function seal(text) {
@@ -48,17 +58,20 @@ function openSecret(sealed) {
   return safeStorage.decryptString(Buffer.from(sealed, 'base64'));
 }
 
-function publicAccount(account) {
+function publicAccount(account, defaultId) {
   return {
     id: account.id,
     provider: account.provider,
     label: account.label,
     meta: account.meta || {},
+    isDefault: Boolean(defaultId) && account.id === defaultId,
   };
 }
 
 function listPublic() {
-  return readState().accounts.map(publicAccount);
+  const state = readState();
+  const defaultId = resolveDefaultId(state.accounts, state.settings.defaultAccountId);
+  return state.accounts.map((account) => publicAccount(account, defaultId));
 }
 
 function getSettings() {
@@ -80,7 +93,10 @@ function addAccount({ provider, label, secret, meta }) {
   const state = readState();
   const hash = fingerprint(secret);
   const duplicate = state.accounts.find((account) => account.provider === provider && account.hash === hash);
-  if (duplicate) return { account: publicAccount(duplicate), created: false };
+  if (duplicate) {
+    const defaultId = resolveDefaultId(state.accounts, state.settings.defaultAccountId);
+    return { account: publicAccount(duplicate, defaultId), created: false };
+  }
   const account = {
     id: crypto.randomUUID(),
     provider,
@@ -90,8 +106,9 @@ function addAccount({ provider, label, secret, meta }) {
     secret: seal(secret),
   };
   state.accounts.push(account);
+  if (state.accounts.length === 1) state.settings.defaultAccountId = account.id;
   writeState(state);
-  return { account: publicAccount(account), created: true };
+  return { account: publicAccount(account, resolveDefaultId(state.accounts, state.settings.defaultAccountId)), created: true };
 }
 
 function updateAccount(id, patch) {
@@ -101,18 +118,41 @@ function updateAccount(id, patch) {
   if (typeof patch.label === 'string' && patch.label.trim()) account.label = patch.label.trim();
   if (patch.meta && typeof patch.meta === 'object') account.meta = { ...account.meta, ...patch.meta };
   writeState(state);
-  return publicAccount(account);
+  const defaultId = resolveDefaultId(state.accounts, state.settings.defaultAccountId);
+  return publicAccount(account, defaultId);
+}
+
+function setDefaultAccount(id) {
+  const state = readState();
+  if (!state.accounts.some((account) => account.id === id)) return listPublic();
+  state.settings.defaultAccountId = id;
+  writeState(state);
+  return listPublic();
+}
+
+function updateSecret(id, secret) {
+  const state = readState();
+  const account = state.accounts.find((item) => item.id === id);
+  if (!account) return null;
+  account.hash = fingerprint(secret);
+  account.secret = seal(secret);
+  writeState(state);
+  const defaultId = resolveDefaultId(state.accounts, state.settings.defaultAccountId);
+  return publicAccount(account, defaultId);
 }
 
 function removeAccount(id) {
   const state = readState();
   state.accounts = state.accounts.filter((account) => account.id !== id);
+  state.settings.defaultAccountId = resolveDefaultId(state.accounts, state.settings.defaultAccountId === id ? null : state.settings.defaultAccountId);
   writeState(state);
   return listPublic();
 }
 
 function eachSecret() {
-  return readState().accounts.map((account) => {
+  const state = readState();
+  const defaultId = resolveDefaultId(state.accounts, state.settings.defaultAccountId);
+  return state.accounts.map((account) => {
     let secret = '';
     try {
       secret = openSecret(account.secret);
@@ -120,7 +160,7 @@ function eachSecret() {
       secret = '';
     }
     return {
-      account: publicAccount(account),
+      account: publicAccount(account, defaultId),
       secret,
     };
   });
@@ -132,6 +172,8 @@ module.exports = {
   updateSettings,
   addAccount,
   updateAccount,
+  setDefaultAccount,
+  updateSecret,
   removeAccount,
   eachSecret,
 };

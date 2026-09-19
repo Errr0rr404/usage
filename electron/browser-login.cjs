@@ -9,6 +9,7 @@ const {
   normalizeMinimaxUri,
   deadlineFrom,
   bundleSecret,
+  ensureGeminiClient,
 } = require('../lib/oauth.cjs');
 
 let current = null;
@@ -418,31 +419,14 @@ function signIn(provider, options = {}) {
     return Promise.resolve({ ok: false, error: 'Choose a service first.' });
   }
   if (provider === 'gemini') {
-    return loadGeminiClient()
-      .then((client) => {
-        PROVIDERS.gemini.clientId = client.clientId;
-        PROVIDERS.gemini.clientSecret = client.clientSecret;
-        return signInLoopback(provider, onProgress);
-      })
+    return ensureGeminiClient()
+      .then(() => signInLoopback(provider, onProgress))
       .catch((error) => ({
         ok: false,
         error: error.message || 'Gemini sign-in could not start.',
       }));
   }
   return signInLoopback(provider, onProgress);
-}
-
-async function loadGeminiClient() {
-  const response = await fetch('https://raw.githubusercontent.com/NoeFabris/opencode-antigravity-auth/main/src/constants.ts', {
-    headers: { Accept: 'text/plain' },
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error('Gemini sign-in could not reach the public login client. Try again.');
-  const text = await response.text();
-  const clientId = text.match(/ANTIGRAVITY_CLIENT_ID\s*=\s*"([^"]+)"/)?.[1];
-  const clientSecret = text.match(/ANTIGRAVITY_CLIENT_SECRET\s*=\s*"([^"]+)"/)?.[1];
-  if (!clientId || !clientSecret) throw new Error('Gemini sign-in could not read the public login client. Try again.');
-  return { clientId, clientSecret };
 }
 
 function cancelSignIn() {

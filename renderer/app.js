@@ -146,7 +146,7 @@ function presentWindow(window) {
   }
   if (window.unit === 'dollars' && window.limit != null && window.used != null) {
     const leftAmount = Math.max(0, window.limit - window.used);
-    const left = window.limit ? (leftAmount / window.limit) * 100 : 0;
+    const left = window.limit > 0 ? (leftAmount / window.limit) * 100 : 0;
     return {
       value: formatMoney(leftAmount),
       unit: 'left',
@@ -158,7 +158,7 @@ function presentWindow(window) {
   }
   if (window.unit === 'count' && window.limit != null && window.used != null) {
     const leftAmount = Math.max(0, window.limit - window.used);
-    const left = (leftAmount / window.limit) * 100;
+    const left = window.limit > 0 ? (leftAmount / window.limit) * 100 : 0;
     const note = [`of ${formatCount(window.limit)}`, reset].filter(Boolean).join(', ');
     return {
       value: formatCount(leftAmount),
@@ -219,7 +219,11 @@ function renderAccount(account) {
   const snapshot = state.snapshots[account.id];
   const plan = titlePlan(snapshot?.plan);
   const confirming = state.pendingRemove === account.id;
-  const actions = `<button type="button" class="${confirming ? 'danger' : ''}" data-remove="${esc(account.id)}">${confirming ? 'Confirm remove' : 'Remove'}</button>`;
+  const canChooseDefault = state.accounts.length > 1;
+  const defaultAction = canChooseDefault
+    ? `<button type="button" data-default="${esc(account.id)}" aria-pressed="${account.isDefault ? 'true' : 'false'}">${account.isDefault ? 'Default' : 'Set default'}</button>`
+    : '';
+  const actions = `${defaultAction}<button type="button" class="${confirming ? 'danger' : ''}" data-remove="${esc(account.id)}">${confirming ? 'Confirm remove' : 'Remove'}</button>`;
   let body = '<p class="meter-note">Checking…</p>';
   if (snapshot?.ok === false) body = `<p class="error">${esc(snapshot.error || 'Could not load usage.')}</p>`;
   else if (snapshot?.ok) {
@@ -465,6 +469,14 @@ board.addEventListener('click', async (event) => {
     openForm(open.dataset.open);
     return;
   }
+  const makeDefault = event.target.closest('[data-default]');
+  if (makeDefault) {
+    const id = makeDefault.dataset.default;
+    state.pendingRemove = null;
+    state.accounts = await desk.setDefaultAccount(id);
+    render();
+    return;
+  }
   const remove = event.target.closest('[data-remove]');
   if (!remove) {
     if (state.pendingRemove) {
@@ -536,6 +548,11 @@ document.addEventListener('keydown', (event) => {
     return;
   }
   if (event.key === 'Escape' && state.formOpen) closeForm();
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'w') {
+    event.preventDefault();
+    desk.hide();
+    return;
+  }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'r') {
     event.preventDefault();
     refresh();

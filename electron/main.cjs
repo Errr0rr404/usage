@@ -7,6 +7,7 @@ const { fetchUsage } = require('../lib/fetch.cjs');
 const { cleanSecret, extractCodexAuth, extractGrokAuth } = require('../lib/parse.cjs');
 const { previewState } = require('../lib/preview.cjs');
 const { trayPng } = require('../lib/tray-icon.cjs');
+const { remainingLeft, trayDisplay, providerName } = require('../lib/tray.cjs');
 const { signIn, cancelSignIn } = require('./browser-login.cjs');
 
 const darwin = process.platform === 'darwin';
@@ -25,35 +26,24 @@ let tray = null;
 let normalBounds = null;
 let compact = false;
 let refreshing = null;
+let lastResult = null;
 const limitState = new Map();
 
-function remainingLeft(window) {
-  if (!window || window.unit === 'unlimited' || window.unit === 'credits' || window.usedPercent == null) return null;
-  return Math.max(0, 100 - window.usedPercent);
+function pruneLimitState(accountId) {
+  for (const key of [...limitState.keys()]) {
+    if (key.startsWith(`${accountId}:`)) limitState.delete(key);
+  }
 }
 
 function updateTray(result) {
-  if (!tray || !result) return;
-  let lowest = null;
-  let lowestName = '';
-  for (const account of result.accounts || []) {
-    const snapshot = result.snapshots?.[account.id];
-    if (!snapshot?.ok) continue;
-    for (const window of snapshot.windows || []) {
-      const left = remainingLeft(window);
-      if (left == null) continue;
-      if (lowest == null || left < lowest) {
-        lowest = left;
-        lowestName = `${providerName(account.provider)} ${window.label}`;
-      }
-    }
-  }
-  const title = lowest == null ? 'Usage Monitor' : `${lowestName} ${Math.round(lowest)}% left`;
-  tray.setToolTip(title);
-  if (darwin) tray.setTitle(lowest == null ? '' : `${Math.round(lowest)}%`);
+  if (result) lastResult = result;
+  if (!tray || !lastResult) return;
+  const display = trayDisplay(lastResult);
+  tray.setToolTip(display.tooltip);
+  if (darwin) tray.setTitle(display.percentText);
   if (!Notification.isSupported()) return;
-  for (const account of result.accounts || []) {
-    const snapshot = result.snapshots?.[account.id];
+  for (const account of lastResult.accounts || []) {
+    const snapshot = lastResult.snapshots?.[account.id];
     if (!snapshot?.ok) continue;
     for (const window of snapshot.windows || []) {
       const left = remainingLeft(window);
@@ -129,7 +119,8 @@ function createTray() {
     if (win.isVisible()) hideWindow();
     else showWindow();
   };
-  tray.on('click', toggle);
+  // Windows left-click should open the board; the context menu stays on right-click.
+  tray.on('click', windows ? showWindow : toggle);
   tray.on('double-click', showWindow);
 }
 
@@ -137,13 +128,9 @@ function createWindow() {
   const settings = preview ? { pinned: true, bounds: null } : store.getSettings();
   const shot = process.argv.includes('--shot');
   const saved = settings.bounds || {};
-  let width = saved.width || 304;
-  let height = saved.height || 500;
-  if (!shot && width >= 360 && height >= 600) {
-    width = 304;
-    height = 500;
-  }
-  const bounds = { ...saved, width: shot ? 320 : width, height: shot ? 640 : height };
+  const width = saved.width || 304;
+  const height = saved.height || 500;
+  const bounds = { ...saved, width: shot ? 304 : width, height: shot ? 652 : height };
   win = new BrowserWindow({
     width: Math.max(280, bounds.width || 304),
     height: Math.max(360, bounds.height || 500),
@@ -191,7 +178,7 @@ function createWindow() {
 
   if (process.argv.includes('--shot')) {
     win.webContents.once('did-finish-load', async () => {
-      await new Promise((resolve) => setTimeout(resolve, process.argv.includes('--compact') ? 1600 : 700));
+      await new Promise((resolve) => setTimeout(resolve, process.argv.includes('--compact') ? 1600 : 900));
       const image = await win.webContents.capturePage();
       fs.writeFileSync(path.join(os.tmpdir(), 'usage-preview.png'), image.toPNG());
       app.exit(0);
@@ -207,7 +194,10 @@ function accountsForRefresh() {
 
 async function refreshAll() {
   const canned = accountsForRefresh();
-  if (canned) return canned;
+  if (canned) {
+    updateTray(canned);
+    return canned;
+  }
   if (refreshing) return refreshing;
   refreshing = (async () => {
     const rows = store.eachSecret();
@@ -224,7 +214,16 @@ async function refreshAll() {
         };
         return;
       }
-      snapshots[account.id] = await fetchUsage(account, secret);
+      const snapshot = await fetchUsage(account, secret);
+      if (snapshot.secret) {
+        try {
+          store.updateSecret(account.id, snapshot.secret);
+        } catch {
+          // The refreshed session still works for this pass even if it could not be locked.
+        }
+        delete snapshot.secret;
+      }
+      snapshots[account.id] = snapshot;
     }));
     const result = { accounts: store.listPublic(), snapshots };
     updateTray(result);
@@ -424,9 +423,31 @@ ipcMain.handle('accounts:update', (_event, id, patch) => {
   return store.updateAccount(id, patch || {});
 });
 
+ipcMain.handle('accounts:default', (_event, id) => {
+  if (preview) {
+    const canned = lastResult || previewState();
+    canned.accounts = canned.accounts.map((account) => ({ ...account, isDefault: account.id === id }));
+    updateTray(canned);
+    return canned.accounts;
+  }
+  const accounts = store.setDefaultAccount(id);
+  if (lastResult) {
+    lastResult.accounts = accounts;
+    updateTray(lastResult);
+  }
+  return accounts;
+});
+
 ipcMain.handle('accounts:remove', (_event, id) => {
-  if (preview) return previewState().accounts;
-  return store.removeAccount(id);
+  if (preview) return (lastResult || previewState()).accounts;
+  const accounts = store.removeAccount(id);
+  pruneLimitState(id);
+  if (lastResult) {
+    lastResult.accounts = accounts;
+    delete lastResult.snapshots[id];
+    updateTray(lastResult);
+  }
+  return accounts;
 });
 
 async function chooseFile() {
@@ -462,18 +483,6 @@ ipcMain.handle('auth:choose', async (_event, provider) => {
   if (!file) return { ok: false, canceled: true };
   return importPayload(provider, file);
 });
-
-function providerName(id) {
-  return {
-    grok: 'Grok',
-    minimax: 'MiniMax',
-    codex: 'Codex',
-    claude: 'Claude',
-    cursor: 'Cursor',
-    copilot: 'Copilot',
-    gemini: 'Gemini',
-  }[id] || 'Account';
-}
 
 app.whenReady().then(() => {
   createTray();
